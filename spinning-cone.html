@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spinning ASCII Cone (Point-Down)</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      color: white;
+      font-family: monospace;
+      overflow: hidden;
+    }
+    pre {
+      font-size: 15px;
+      line-height: 10px;
+      white-space: pre;
+      text-align: center;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  </style>
+</head>
+<body>
+  <pre id="cone"></pre>
+  <script>
+    const coneEl = document.getElementById('cone');
+    const n = 30, r = 1;
+    const points = [];
+
+    // Base circle in XZ-plane at y = +1
+    for (let i = 0; i < n; i++) {
+      const θ = (2 * Math.PI / n) * i;
+      points.push([
+        r * Math.cos(θ),   // x
+        +1,                // y (base up)
+        r * Math.sin(θ)    // z
+      ]);
+    }
+    // Apex at y = -1
+    points.push([0, -1, 0]);  // index = n
+
+    // Build edges: rim + spokes to apex
+    const edges = [];
+    const apexIdx = points.length - 1;
+    for (let i = 0; i < n; i++) {
+      edges.push([i, (i + 1) % n]);
+      edges.push([i, apexIdx]);
+    }
+
+    // Rotate around Y-axis
+    function rotateY([x,y,z], θ) {
+      const c = Math.cos(θ), s = Math.sin(θ);
+      return [ c*x - s*z, y, s*x + c*z ];
+    }
+
+    // Perspective projection
+    const scale = 12;
+    function project([x,y,z]) {
+      const d = 3, f = d / (d + z);
+      return [ Math.round(x * f * scale),
+               Math.round(y * f * scale) ];
+    }
+
+    // Bresenham’s line
+    function drawLine(buf, x0,y0, x1,y1) {
+      x0 = Math.round(x0); y0 = Math.round(y0);
+      x1 = Math.round(x1); y1 = Math.round(y1);
+      const dx = Math.abs(x1-x0), sx = x0<x1 ? 1:-1;
+      const dy = -Math.abs(y1-y0), sy = y0<y1 ? 1:-1;
+      let err = dx + dy;
+      while (true) {
+        if (y0>=0 && y0<buf.length && x0>=0 && x0<buf[0].length) {
+          buf[y0][x0] = '#';
+        }
+        if (x0===x1 && y0===y1) break;
+        const e2 = 2*err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+      }
+    }
+
+    // Animation
+    let angle = 0;
+    function render() {
+      const W = 80, H = 40;
+      const buf = Array.from({length:H}, () => Array(W).fill(' '));
+
+      // rotate & project
+      const rot = points.map(p => rotateY(p, angle));
+      const proj = rot.map(project);
+
+      // draw edges
+      for (const [i,j] of edges) {
+        const [x0,y0] = proj[i], [x1,y1] = proj[j];
+        drawLine(buf, x0 + W/2, y0 + H/2, x1 + W/2, y1 + H/2);
+      }
+
+      coneEl.textContent = buf.map(r => r.join('')).join('\n');
+      angle += 0.04;  // use negative for reverse spin
+      requestAnimationFrame(render);
+    }
+    render();
+  </script>
+</body>
+</html>
